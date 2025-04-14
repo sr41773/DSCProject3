@@ -45,6 +45,7 @@ public class Coordinator {
     private void processRequest(String request) {
         String[] parts = request.split(" ");
         String command = parts[0];
+        String participantId;
 
         switch (command) {
             case "register":
@@ -52,25 +53,28 @@ public class Coordinator {
                     System.out.println("Error: Invalid register format.");
                     return;
                 }
-                String participantId = parts[1];
+                participantId = parts[1];
                 String ip = parts[2];
                 int threadBPort = Integer.parseInt(parts[3]);
-                participants.put(participantId, new ParticipantInfo(ip, threadBPort, "online"));
+                participants.put(participantId, new ParticipantInfo(participantId, ip, threadBPort, "online"));
                 System.out.println("Participant " + participantId + " registered at IP " + ip + " and port " + threadBPort);
                 break;
+
             case "deregister":
                 participantId = parts[1];
                 participants.remove(participantId);
                 System.out.println("Participant " + participantId + " deregistered.");
                 break;
+
             case "disconnect":
                 participantId = parts[1];
-                ParticipantInfo participant = participants.get(participantId);
-                if (participant != null) {
-                    participant.setStatus("offline");
+                ParticipantInfo p1 = participants.get(participantId);
+                if (p1 != null) {
+                    p1.setStatus("offline");
                     System.out.println("Participant " + participantId + " disconnected.");
                 }
                 break;
+
             case "reconnect":
                 if (parts.length != 3) {
                     System.out.println("Error: Invalid reconnect format.");
@@ -78,14 +82,15 @@ public class Coordinator {
                 }
                 participantId = parts[1];
                 int newPort = Integer.parseInt(parts[2]);
-                participant = participants.get(participantId);
-                if (participant != null) {
-                    participant.setStatus("online");
-                    participant.setPort(newPort);
+                ParticipantInfo p2 = participants.get(participantId);
+                if (p2 != null) {
+                    p2.setStatus("online");
+                    p2.setPort(newPort);
                     System.out.println("Participant " + participantId + " reconnected.");
                     sendMessagesToParticipant(participantId);
                 }
                 break;
+
             case "msend":
                 if (parts.length < 3) {
                     System.out.println("Error: Invalid msend format.");
@@ -98,6 +103,9 @@ public class Coordinator {
                 System.out.println("Message from " + participantId + ": " + message);
                 sendMessagesToOnlineParticipants();
                 break;
+
+            default:
+                System.out.println("Error: Unknown command.");
         }
     }
 
@@ -109,17 +117,17 @@ public class Coordinator {
         long thresholdTime = currentTime - (persistenceTime * 1000);
 
         List<Message> eligibleMessages = messages.stream()
-            .filter(msg -> msg.getTimestamp() > thresholdTime)
-            .collect(Collectors.toList());
+                .filter(msg -> msg.getTimestamp() > thresholdTime)
+                .collect(Collectors.toList());
 
         for (Message message : eligibleMessages) {
-            try {
-                Socket socket = new Socket(participant.getIp(), participant.getPort());
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            try (Socket socket = new Socket(participant.getIp(), participant.getPort());
+                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+
                 out.println("msend " + message.getSenderId() + " " + message.getMessage());
-                socket.close();
+
             } catch (IOException e) {
-                System.out.println("Error sending message to participant " + participantId + ": " + e.getMessage());
+                System.out.println("Error sending message to " + participantId + ": " + e.getMessage());
             }
         }
     }
@@ -145,67 +153,5 @@ public class Coordinator {
         } catch (IOException e) {
             System.out.println("Error reading config file: " + e.getMessage());
         }
-    }
-}
-
-class ParticipantInfo {
-    private String id;
-    private String ip;
-    private int port;
-    private String status;
-
-    public ParticipantInfo(String ip, int port, String status) {
-        this.ip = ip;
-        this.port = port;
-        this.status = status;
-        this.id = ip + ":" + port;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public String getIp() {
-        return ip;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-}
-
-class Message {
-    private final String senderId;
-    private final String message;
-    private final long timestamp;
-
-    public Message(String senderId, String message, long timestamp) {
-        this.senderId = senderId;
-        this.message = message;
-        this.timestamp = timestamp;
-    }
-
-    public String getSenderId() {
-        return senderId;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
     }
 }
