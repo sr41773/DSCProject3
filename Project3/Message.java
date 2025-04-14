@@ -1,4 +1,6 @@
-public class Message {
+import java.io.Serializable;
+
+public class Message implements Serializable {
     private String senderId;
     private String message;
     private long timestamp;
@@ -19,5 +21,10 @@ public class Message {
 
     public long getTimestamp() {
         return timestamp;
+    }
+
+    @Override
+    public String toString() {
+        return "[" + senderId + "] " + message + " (" + timestamp + ")";
     }
 }
