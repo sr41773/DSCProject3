@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.*;
-import java.util.Date;
 import java.util.concurrent.*;
 
 public class Participant {
@@ -47,7 +46,7 @@ public class Participant {
         ) {
             String message = in.readLine();
             if (message != null) {
-                logWriter.write("[" + new Date() + "] " + message + "\n");
+                logWriter.write(message + "\n");
                 logWriter.flush();
                 System.out.println("Received and logged multicast message: " + message);
             }
@@ -80,7 +79,7 @@ public class Participant {
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
-            out.println("register " + id + " " + coordinatorIP + " " + port); // Use coordinatorIP from config
+            out.println("register " + id + " " + InetAddress.getLocalHost().getHostAddress() + " " + port);
             System.out.println("Registered participant " + id);
         } catch (IOException e) {
             System.out.println("Error registering: " + e.getMessage());
