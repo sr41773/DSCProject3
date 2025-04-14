@@ -1,4 +1,0 @@
-register 102 127.0.0.1 6602
-msend 102 yoo
-reconnect 102 6602
-msend 102 ok
