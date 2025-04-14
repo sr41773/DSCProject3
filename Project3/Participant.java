@@ -1,3 +1,4 @@
+
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.*;
@@ -80,6 +81,7 @@ public class Participant {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
             out.println("register " + id + " " + InetAddress.getLocalHost().getHostAddress() + " " + port);
+            isOnline = true;
             System.out.println("Registered participant " + id);
         } catch (IOException e) {
             System.out.println("Error registering: " + e.getMessage());
@@ -95,6 +97,7 @@ public class Participant {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
             out.println("reconnect " + id + " " + port);
+            isOnline = true;
             System.out.println("Participant " + id + " reconnected.");
         } catch (IOException e) {
             System.out.println("Error reconnecting: " + e.getMessage());
@@ -109,25 +112,35 @@ public class Participant {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
             out.println("disconnect " + id);
+            isOnline = false;
             System.out.println("Participant " + id + " disconnected.");
         } catch (IOException e) {
-            System.out.println("Error disconnecting: " + e.getMessage());
+            System.out.println("Disconnected");
         }
     }
 
     public void deregister() {
         stopThreadB();
-
+    
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
             out.println("deregister " + id);
+            isOnline = false;
             System.out.println("Deregistered participant " + id);
+    
+            // Log it to the message log file
+            try (BufferedWriter logWriter = new BufferedWriter(new FileWriter(logFile, true))) {
+                logWriter.write("deregister " + id + "\n");
+                logWriter.flush();
+            }
         } catch (IOException e) {
-            System.out.println("Error deregistering: " + e.getMessage());
+            System.out.println("Deregistering");
         }
     }
+    
+        
 
     private void stopThreadB() {
         isOnline = false;
