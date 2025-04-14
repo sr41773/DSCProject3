@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 
 public class Coordinator {
     private final int port;
-    private final int persistenceTime;  // Temporally-bound persistence threshold
+    private final int persistenceTime; // Temporally-bound persistence threshold
     private final Map<String, ParticipantInfo> participants = new ConcurrentHashMap<>();
     private final List<Message> messages = Collections.synchronizedList(new ArrayList<>());
 
@@ -29,7 +29,7 @@ public class Coordinator {
 
     private void handleClient(Socket clientSocket) {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
+                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
 
             String data = in.readLine();
             if (data != null) {
@@ -57,13 +57,18 @@ public class Coordinator {
                 String ip = parts[2];
                 int threadBPort = Integer.parseInt(parts[3]);
                 participants.put(participantId, new ParticipantInfo(participantId, ip, threadBPort, "online"));
-                System.out.println("Participant " + participantId + " registered at IP " + ip + " and port " + threadBPort);
+                System.out.println(
+                        "Participant " + participantId + " registered at IP " + ip + " and port " + threadBPort);
+
+                broadcastSystemMessage("register " + participantId + " " + ip + " " + threadBPort); // ✅ NEW
                 break;
 
             case "deregister":
                 participantId = parts[1];
                 participants.remove(participantId);
                 System.out.println("Participant " + participantId + " deregistered.");
+
+                broadcastSystemMessage("deregister " + participantId); // ✅ NEW
                 break;
 
             case "disconnect":
@@ -72,6 +77,7 @@ public class Coordinator {
                 if (p1 != null) {
                     p1.setStatus("offline");
                     System.out.println("Participant " + participantId + " disconnected.");
+                    broadcastSystemMessage("disconnect " + participantId); // ✅ NEW
                 }
                 break;
 
@@ -87,6 +93,7 @@ public class Coordinator {
                     p2.setStatus("online");
                     p2.setPort(newPort);
                     System.out.println("Participant " + participantId + " reconnected.");
+                    broadcastSystemMessage("reconnect " + participantId + " " + newPort); // ✅ NEW
                     sendMessagesToParticipant(participantId);
                 }
                 break;
@@ -111,7 +118,8 @@ public class Coordinator {
 
     private void sendMessagesToParticipant(String participantId) {
         ParticipantInfo participant = participants.get(participantId);
-        if (participant == null || !participant.getStatus().equals("online")) return;
+        if (participant == null || !participant.getStatus().equals("online"))
+            return;
 
         long currentTime = System.currentTimeMillis();
         long thresholdTime = currentTime - (persistenceTime * 1000);
@@ -122,7 +130,7 @@ public class Coordinator {
 
         for (Message message : eligibleMessages) {
             try (Socket socket = new Socket(participant.getIp(), participant.getPort());
-                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
 
                 out.println("msend " + message.getSenderId() + " " + message.getMessage());
 
@@ -154,4 +162,19 @@ public class Coordinator {
             System.out.println("Error reading config file: " + e.getMessage());
         }
     }
+
+    private void broadcastSystemMessage(String message) {
+        for (ParticipantInfo participant : participants.values()) {
+            if ("online".equals(participant.getStatus())) {
+                try (Socket socket = new Socket(participant.getIp(), participant.getPort());
+                        PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+                    out.println(message);
+                } catch (IOException e) {
+                    System.out
+                            .println("Error sending system message to " + participant.getId() + ": " + e.getMessage());
+                }
+            }
+        }
+    }
+
 }
