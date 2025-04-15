@@ -57,27 +57,31 @@ public class Coordinator {
                 String ip = parts[2];
                 int threadBPort = Integer.parseInt(parts[3]);
                 participants.put(participantId, new ParticipantInfo(participantId, ip, threadBPort, "online"));
-                System.out.println(
-                        "Participant " + participantId + " registered at IP " + ip + " and port " + threadBPort);
-
-                broadcastSystemMessage("register " + participantId + " " + ip + " " + threadBPort); // ✅ NEW
+                System.out.println("Participant " + participantId + " registered at IP " + ip + " and port " + threadBPort);
                 break;
 
             case "deregister":
+                if (parts.length != 2) {
+                    System.out.println("Error: Invalid deregister format.");
+                    return;
+                }
                 participantId = parts[1];
                 participants.remove(participantId);
                 System.out.println("Participant " + participantId + " deregistered.");
-
-                broadcastSystemMessage("deregister " + participantId); // ✅ NEW
                 break;
 
             case "disconnect":
+                if (parts.length != 2) {
+                    System.out.println("Error: Invalid disconnect format.");
+                    return;
+                }
                 participantId = parts[1];
                 ParticipantInfo p1 = participants.get(participantId);
                 if (p1 != null) {
                     p1.setStatus("offline");
                     System.out.println("Participant " + participantId + " disconnected.");
-                    broadcastSystemMessage("disconnect " + participantId); // ✅ NEW
+                } else {
+                    System.out.println("Error: Participant " + participantId + " not found.");
                 }
                 break;
 
@@ -90,11 +94,11 @@ public class Coordinator {
                 int newPort = Integer.parseInt(parts[2]);
                 ParticipantInfo p2 = participants.get(participantId);
                 if (p2 != null) {
-                    p2.setStatus("online");
                     p2.setPort(newPort);
-                    System.out.println("Participant " + participantId + " reconnected.");
-                    broadcastSystemMessage("reconnect " + participantId + " " + newPort); // ✅ NEW
-                    sendMessagesToParticipant(participantId);
+                    p2.setStatus("online");
+                    System.out.println("Participant " + participantId + " reconnected on port " + newPort);
+                } else {
+                    System.out.println("Error: Participant " + participantId + " not found.");
                 }
                 break;
 
@@ -105,14 +109,11 @@ public class Coordinator {
                 }
                 participantId = parts[1];
                 String message = String.join(" ", Arrays.copyOfRange(parts, 2, parts.length));
-                Message newMessage = new Message(participantId, message, System.currentTimeMillis());
-                messages.add(newMessage);
                 System.out.println("Message from " + participantId + ": " + message);
-                sendMessagesToOnlineParticipants();
                 break;
 
             default:
-                System.out.println("Error: Unknown command.");
+                System.out.println("Error: Unknown command - " + command);
         }
     }
 

@@ -1,6 +1,6 @@
-
 import java.io.*;
 import java.net.*;
+import java.util.Date;
 import java.util.concurrent.*;
 
 public class Participant {
@@ -47,9 +47,10 @@ public class Participant {
         ) {
             String message = in.readLine();
             if (message != null) {
-                logWriter.write(message + "\n");
+                String timestampedMessage = "[" + new Date() + "] " + message;
+                logWriter.write(timestampedMessage + "\n");
                 logWriter.flush();
-                System.out.println("Received and logged multicast message: " + message);
+                System.out.println("Received and logged multicast message: " + timestampedMessage);
             }
         } catch (IOException e) {
             System.out.println("Error handling multicast message: " + e.getMessage());
@@ -114,14 +115,20 @@ public class Participant {
             out.println("disconnect " + id);
             isOnline = false;
             System.out.println("Participant " + id + " disconnected.");
+
+            // Log the event
+            try (BufferedWriter logWriter = new BufferedWriter(new FileWriter(logFile, true))) {
+                logWriter.write("[" + new Date() + "] disconnect " + id + "\n");
+                logWriter.flush();
+            }
         } catch (IOException e) {
-            System.out.println("Disconnected");
+            System.out.println("Error disconnecting: " + e.getMessage());
         }
     }
 
     public void deregister() {
         stopThreadB();
-    
+
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
@@ -129,18 +136,22 @@ public class Participant {
             out.println("deregister " + id);
             isOnline = false;
             System.out.println("Deregistered participant " + id);
-    
-            // Log it to the message log file
+
+            // Log the event
             try (BufferedWriter logWriter = new BufferedWriter(new FileWriter(logFile, true))) {
-                logWriter.write("deregister " + id + "\n");
+                logWriter.write("[" + new Date() + "] deregister " + id + "\n");
                 logWriter.flush();
             }
         } catch (IOException e) {
-            System.out.println("Deregistering");
+            System.out.println("Error deregistering: " + e.getMessage());
+
+
         }
+
+
     }
-    
-        
+
+
 
     private void stopThreadB() {
         isOnline = false;
@@ -200,6 +211,7 @@ public class Participant {
                         break;
                     case "exit":
                         System.out.println("Exiting.");
+                        participant.deregister(); // Ensure the participant deregisters before exiting
                         participant.executorService.shutdownNow();
                         return;
                     default:
