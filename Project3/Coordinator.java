@@ -17,6 +17,8 @@ public class Coordinator {
 
     public void start() {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
+            //serverSocket.setReuseAddress(true);                         // allow fast restart
+            //serverSocket.bind(new InetSocketAddress(port));             // explicit bind
             System.out.println("Coordinator started on port " + port);
             while (true) {
                 Socket clientSocket = serverSocket.accept();
@@ -46,6 +48,9 @@ public class Coordinator {
         String[] parts = request.split(" ");
         String command = parts[0];
         String participantId;
+
+        // Log the received command
+        System.out.println("Received command: " + request);
 
         switch (command) {
             case "register":
@@ -86,17 +91,19 @@ public class Coordinator {
                 break;
 
             case "reconnect":
-                if (parts.length != 3) {
+                if (parts.length != 4) {
                     System.out.println("Error: Invalid reconnect format.");
                     return;
                 }
                 participantId = parts[1];
-                int newPort = Integer.parseInt(parts[2]);
+                //int newPort = Integer.parseInt(parts[2]);
+                int newPort = Integer.parseInt(parts[3]);
                 ParticipantInfo p2 = participants.get(participantId);
                 if (p2 != null) {
                     p2.setPort(newPort);
                     p2.setStatus("online");
                     System.out.println("Participant " + participantId + " reconnected on port " + newPort);
+                    sendPendingMessages(p2);
                 } else {
                     System.out.println("Error: Participant " + participantId + " not found.");
                 }
@@ -109,11 +116,49 @@ public class Coordinator {
                 }
                 participantId = parts[1];
                 String message = String.join(" ", Arrays.copyOfRange(parts, 2, parts.length));
-                System.out.println("Message from " + participantId + ": " + message);
+                //System.out.println("Message from " + participantId + ": " + message);
+
+                Message m = new Message(participantId, message, System.currentTimeMillis());
+                messages.add(m);
+
+                // immediate fan‑out to all **online** members
+                sendMessagesToOnlineParticipants(m);
+                System.out.println("Multicast from " + participantId + ": " + message);
                 break;
 
             default:
                 System.out.println("Error: Unknown command - " + command);
+        }
+    }
+
+    private void sendPendingMessages(ParticipantInfo pi) {
+        long horizon = System.currentTimeMillis() - (persistenceTime * 1000L);
+        for (Message msg : messages) {
+            if (msg.getTimestamp() <= horizon) continue;                 // outside td window
+            if (msg.getTimestamp() <= pi.getLastDelivered()) continue;   // duplicate
+            sendSingleMessage(pi, msg);
+        }
+    }
+
+    private void sendMessagesToOnlineParticipants(Message fresh) {
+        for (ParticipantInfo pi : participants.values()) {
+            if (!"online".equals(pi.getStatus())) 
+                continue;
+            sendSingleMessage(pi, fresh);
+        }
+    }
+
+    private void sendSingleMessage(ParticipantInfo pi, Message msg) {
+        try (Socket s = new Socket(pi.getIp(), pi.getPort());
+             PrintWriter out = new PrintWriter(s.getOutputStream(), true)) 
+             {
+                out.println("msend " + msg.getSenderId() + " " + msg.getMessage());
+                pi.setLastDelivered(msg.getTimestamp());          // mark delivered
+                System.out.printf("[TX] \"%s\" -> %s%n", msg.getMessage(), pi.getId());
+    
+        } catch (IOException e) {
+            System.out.println("Error sending to " + pi.getId() + ": " + e.getMessage());
+            pi.setStatus("offline");                          // mark unreachable
         }
     }
 

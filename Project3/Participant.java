@@ -25,7 +25,12 @@ public class Participant {
     public void startThreadB(int port) {
         executorService.submit(() -> {
             try {
-                threadBSocket = new ServerSocket(port);
+                //threadBSocket = new ServerSocket(port);
+                ServerSocket tmp = new ServerSocket();
+                tmp.setReuseAddress(true);
+                tmp.bind(new InetSocketAddress(port));
+                threadBSocket = tmp;
+
                 this.currentPort = port;
                 isOnline = true;
                 while (isOnline) {
@@ -65,9 +70,11 @@ public class Participant {
 
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
         ) {
             out.println("msend " + id + " " + message);
+            in.readLine();
         } catch (IOException e) {
             System.out.println("Error sending message: " + e.getMessage());
         }
@@ -79,9 +86,11 @@ public class Participant {
 
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
         ) {
             out.println("register " + id + " " + InetAddress.getLocalHost().getHostAddress() + " " + port);
+            in.readLine();
             isOnline = true;
             System.out.println("Registered participant " + id);
         } catch (IOException e) {
@@ -95,9 +104,12 @@ public class Participant {
 
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
         ) {
-            out.println("reconnect " + id + " " + port);
+            //out.println("reconnect " + id + " " + port);
+            out.println("reconnect " + id + " " + InetAddress.getLocalHost().getHostAddress() + " " + port);
+            in.readLine();  
             isOnline = true;
             System.out.println("Participant " + id + " reconnected.");
         } catch (IOException e) {
@@ -110,9 +122,11 @@ public class Participant {
 
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
         ) {
             out.println("disconnect " + id);
+            in.readLine();
             isOnline = false;
             System.out.println("Participant " + id + " disconnected.");
 
@@ -131,9 +145,11 @@ public class Participant {
 
         try (
             Socket socket = new Socket(coordinatorIP, coordinatorPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
         ) {
             out.println("deregister " + id);
+            in.readLine();
             isOnline = false;
             System.out.println("Deregistered participant " + id);
 
@@ -144,8 +160,6 @@ public class Participant {
             }
         } catch (IOException e) {
             System.out.println("Error deregistering: " + e.getMessage());
-
-
         }
 
 
@@ -161,6 +175,12 @@ public class Participant {
             } catch (IOException e) {
                 System.out.println("Error closing thread-B socket: " + e.getMessage());
             }
+        }
+        threadBSocket = null;
+        try { 
+            Thread.sleep(200); 
+        } catch (InterruptedException ignored) {
+            // Ignore the exception
         }
     }
 
